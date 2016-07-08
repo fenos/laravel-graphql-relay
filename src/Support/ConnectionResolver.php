@@ -7,9 +7,49 @@ use Illuminate\Database\Eloquent\Model;
 use GraphQL\Type\Definition\ResolveInfo;
 use Illuminate\Pagination\LengthAwarePaginator as Paginator;
 
+/**
+ * Class ConnectionResolver
+ *
+ * @package Nuwave\Relay\Support
+ */
 class ConnectionResolver
 {
     use GlobalIdTrait;
+
+    /**
+     * @param             $root
+     * @param array       $args
+     * @param ResolveInfo $info
+     * @param Model       $model
+     *
+     * @return Paginator
+     */
+    public function resolveTopQuery($root, array $args, ResolveInfo $info, Model $model)
+    {
+        if (isset($args['first'])) {
+            $first       = $args['first'];
+            $after       = $this->decodeCursor($args);
+            $currentPage = $first && $after ? floor(($first + $after) / $first) : 1;
+
+            $items = $model->newQuery()->paginate($args['first'],['*'],null,$currentPage);
+            $total = $items->count();
+
+            return new Paginator(
+                $items->slice($after)->take($first),
+                $total,
+                $first,
+                $currentPage
+            );
+        }
+
+        $items = $model->newQuery()->get();
+
+        return new Paginator(
+            $items,
+            count($items),
+            (count($items) > 0 ? count($items) : 1)
+        );
+    }
 
     /**
      * Attempt to auto-resolve connection.
